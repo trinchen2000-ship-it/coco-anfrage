@@ -383,5 +383,57 @@ app.post('/submit', upload.array('bilder', 10), async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+// ============================================================
+// In server.js der anfrage-App hinzufügen
+// ============================================================
+// 1) Falls Body-Parser-Limit noch nicht hoch genug:
+//    app.use(express.json({ limit: '5mb' }));
+//
+// 2) Diese Routes irgendwo nach app.use() einfügen:
+// ============================================================
 
+// CORS-Preflight für links.coco-colours.de
+app.options('/api/mietfrei', (req, res) => {
+  res.set('Access-Control-Allow-Origin', 'https://links.coco-colours.de');
+  res.set('Access-Control-Allow-Methods', 'POST');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(204);
+});
+
+// Endpoint: empfängt PDF + Daten, schickt Mail an Trine
+app.post('/api/mietfrei', async (req, res) => {
+  res.set('Access-Control-Allow-Origin', 'https://links.coco-colours.de');
+
+  try {
+    const { pdfBase64, vermieter, mieter, seitDatum } = req.body;
+
+    if (!pdfBase64 || !vermieter || !mieter) {
+      return res.status(400).json({ error: 'Felder fehlen' });
+    }
+
+    await resend.emails.send({
+      from: 'Coco Colours <noreply@coco-colours.de>',     // ← anpassen falls anders
+      to: 'trine@coco-colours.de',                         // ← deine Mailadresse
+      subject: `Mietschuldenfreiheitsbescheinigung ${mieter} – unterzeichnet`,
+      html: `
+        <p>Die Mietschuldenfreiheitsbescheinigung wurde unterzeichnet.</p>
+        <ul>
+          <li><strong>Vermieter:</strong> ${vermieter}</li>
+          <li><strong>Mieterin:</strong> ${mieter}</li>
+          <li><strong>Mietverhältnis seit:</strong> ${seitDatum}</li>
+        </ul>
+        <p>Das fertige PDF ist im Anhang.</p>
+      `,
+      attachments: [{
+        filename: `Mietschuldenfreiheitsbescheinigung_${mieter.replace(/\s+/g, '_')}.pdf`,
+        content: pdfBase64
+      }]
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Mietfrei error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.listen(PORT, () => console.log(`Coco Anfrage läuft auf Port ${PORT}`));
