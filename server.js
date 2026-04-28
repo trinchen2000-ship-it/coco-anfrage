@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.json({ limit: '5mb' }));
+
 // ── Resend E-Mail ───────────────────────────────────────────────
 async function sendMail({ to, subject, html, attachments = [] }) {
   const body = {
